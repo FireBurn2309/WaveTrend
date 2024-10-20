@@ -1,0 +1,87 @@
+//@version=4
+study(title = 'WaveTrend', shorttitle = 'WT')
+
+// PARAMETERS {
+wtShow = input(true, title = 'Show WaveTrend', type = input.bool)
+wtBuyShow = input(true, title = 'Show Buy dots', type = input.bool)
+wtSellShow = input(true, title = 'Show Sell dots', type = input.bool)
+vwapShow = input(true, title = 'Show Fast WT', type = input.bool)
+wtChannelLen = input(9, title = 'WT Channel Length')
+wtAverageLen = input(12, title = 'WT Average Length')
+wtMASource = input(hlc3, title = 'WT MA Source')
+wtMALen = input(3, title = 'WT MA Length')
+
+// WaveTrend Overbought & Oversold lines
+obLevel = input(53, title = 'WT Overbought Level 1')
+obLevel2 = input(60, title = 'WT Overbought Level 2')
+osLevel = input(-53, title = 'WT Oversold Level 1')
+osLevel2 = input(-60, title = 'WT Oversold Level 2')
+
+// } PARAMETERS
+
+// FUNCTIONS {
+
+// WaveTrend
+f_wavetrend(src, chlen, avg, malen, tf) =>
+    tfsrc = security(syminfo.tickerid, tf, src)
+    esa = ema(tfsrc, chlen)
+    de = ema(abs(tfsrc - esa), chlen)
+    ci = (tfsrc - esa) / (0.015 * de)
+    wt1 = security(syminfo.tickerid, tf, ema(ci, avg))
+    wt2 = security(syminfo.tickerid, tf, sma(wt1, malen))
+    wtVwap = wt1 - wt2
+    wtOversold = wt2 <= osLevel
+    wtOverbought = wt2 >= obLevel
+    wtCross = cross(wt1, wt2)
+    wtCrossUp = wt2 - wt1 <= 0
+    wtCrossDown = wt2 - wt1 >= 0
+    [wt1, wt2, wtOversold, wtOverbought, wtCross, wtCrossUp, wtCrossDown, wtVwap]
+
+// } FUNCTIONS  
+
+// CALCULATE INDICATORS {
+
+// Calculates WaveTrend
+[wt1, wt2, wtOversold, wtOverbought, wtCross, wtCrossUp, wtCrossDown, wtVwap] = f_wavetrend(wtMASource, wtChannelLen, wtAverageLen, wtMALen, timeframe.period)
+
+// Small Circles WT Cross
+signalColor = wt2 - wt1 > 0 ? color.red : color.lime
+
+// Buy signal
+buySignal = wtCross and wtCrossUp and wtOversold
+
+// Sell signal
+sellSignal = wtCross and wtCrossDown and wtOverbought
+
+// } CALCULATE INDICATORS
+
+// DRAW {
+plot(wtShow ? wt1 : na, title='WT Wave 1', color=color.blue, transp=0)
+plot(wtShow ? wt2 : na, title='WT Wave 2', color=color.red, transp=0)
+
+// VWAP
+plot(vwapShow ? wtVwap : na, title = 'VWAP', color = color.white, style = plot.style_area, linewidth = 2, transp = 45)
+
+// Draw Overbought & Oversold lines
+plot(obLevel2, title = 'Over Bought Level 2', color = color.white, linewidth = 1, style = plot.style_stepline)
+plot(osLevel2, title = 'Over Sold Level 2', color = color.white, linewidth = 1, style = plot.style_stepline)
+
+// Circles
+plot(wtCross ? wt2 : na, title = 'Buy and sell circle', color = signalColor, style = plot.style_circles, linewidth = 3)
+
+plotchar(wtBuyShow and buySignal ? -107 : na, title = 'Buy circle', char='·', color = color.lime, location = location.absolute, size = size.small)
+plotchar(wtSellShow and sellSignal ? 105 : na , title = 'Sell circle', char='·', color = color.red, location = location.absolute, size = size.small)
+
+// } DRAW
+
+// ALERTS {
+  
+// BUY
+alertcondition(buySignal, 'Buy (Big green circle)', 'Green circle WaveTrend Oversold')
+alertcondition(wtCross and wtCrossUp, 'Buy (Small green dot)', 'Buy small circle')
+
+// SELL
+alertcondition(sellSignal, 'Sell (Big red circle)', 'Red Circle WaveTrend Overbought')
+alertcondition(wtCross and wtCrossDown, 'Sell (Small red dot)', 'Sell small circle')
+
+// } ALERTS
